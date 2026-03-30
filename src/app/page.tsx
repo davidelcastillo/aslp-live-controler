@@ -40,7 +40,7 @@ export default function Home() {
       <header className="bg-[#111113] border-b border-zinc-800/80 px-6 py-3">
         <div className="flex items-center justify-between font-mulish">
           <div className="flex items-center gap-3">
-            <Image src={logo} alt="ASLP Logo" width={36} height={36} className="rounded" />
+            <Image src={logo} alt="ASLP Logo" width={56} height={56} className="rounded" />
             <div className="flex flex-col leading-none">
               <h1 className="text-sm font-black tracking-tight text-white">
                 ASLP POWERLIFTING
