@@ -7,6 +7,11 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-4-38bdf8?logo=tailwind-css)
 ![DaisyUI](https://img.shields.io/badge/DaisyUI-5-pink)
 ![Supabase](https://img.shields.io/badge/Supabase-Live%20Realtime-green?logo=supabase)
+[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?logo=vercel)](https://powerlifting-controller.vercel.app)
+
+## 🌐 Producción
+
+**URL:** [https://powerlifting-controller.vercel.app](https://powerlifting-controller.vercel.app)
 
 ---
 
