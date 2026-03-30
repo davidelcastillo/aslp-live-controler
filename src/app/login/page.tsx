@@ -5,22 +5,19 @@ import { useAuth } from "@/components/AuthProvider";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const { signIn, signUp } = useAuth();
+  const { signIn } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    const result = isSignUp
-      ? await signUp(email, password)
-      : await signIn(email, password);
+    const result = await signIn(email, password);
 
     if (result.error) {
       setError(result.error);
@@ -89,27 +86,8 @@ export default function LoginPage() {
             disabled={loading}
             className="btn w-full bg-[#c41e3a] hover:bg-[#b01830] disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-bold py-2.5 rounded-full shadow-[0_3px_8px_rgba(196,30,58,0.35)] hover:shadow-[0_6px_16px_rgba(196,30,58,0.45)] hover:-translate-y-1 active:translate-y-0 active:shadow-[0_1px_4px_rgba(196,30,58,0.3)] transition-all duration-200 tracking-wide border-none"
           >
-            {loading
-              ? "Cargando..."
-              : isSignUp
-              ? "Crear cuenta"
-              : "Iniciar sesión"}
+            {loading ? "Cargando..." : "Iniciar sesión"}
           </button>
-
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setError(null);
-              }}
-              className="btn btn-ghost text-[#c41e3a] hover:bg-[#c41e3a]/10 text-sm rounded-full px-3 py-1 transition-all duration-200 border-none"
-            >
-              {isSignUp
-                ? "¿Ya tenés cuenta? Iniciar sesión"
-                : "¿No tenés cuenta? Crear una"}
-            </button>
-          </div>
         </form>
       </div>
     </div>

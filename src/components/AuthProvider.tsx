@@ -8,13 +8,13 @@ import {
   useCallback,
 } from "react";
 import { supabase } from "@/lib/supabase";
+import { isAuthorized } from "@/lib/auth-config";
 import type { Session, User } from "@supabase/supabase-js";
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
@@ -29,8 +29,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Obtener sesión inicial
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      // Auto-signout si el email no está autorizado
+      if (currentUser && !isAuthorized(currentUser.email)) {
+        supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+      } else {
+        setSession(session);
+        setUser(currentUser);
+      }
       setLoading(false);
     });
 
@@ -38,20 +46,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      // Auto-signout si el email no está autorizado
+      if (currentUser && !isAuthorized(currentUser.email)) {
+        supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+      } else {
+        setSession(session);
+        setUser(currentUser);
+      }
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
-    return { error: error?.message ?? null };
-  }, []);
-
   const signIn = useCallback(async (email: string, password: string) => {
+    // Verificar autorización antes de intentar login
+    if (!isAuthorized(email)) {
+      return { error: "Email no autorizado para acceder al panel." };
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -65,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, signUp, signIn, signOut }}
+      value={{ user, session, loading, signIn, signOut }}
     >
       {children}
     </AuthContext.Provider>
