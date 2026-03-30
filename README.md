@@ -11,7 +11,7 @@
 
 ## 🌐 Producción
 
-**URL:** [https://powerlifting-controller.vercel.app](https://powerlifting-controller.vercel.app)
+**URL:** [https://powerlifting-controller.vercel.app](https://powerlifting-controller-6ixiuov3m-davidelcastillos-projects.vercel.app/)
 
 ---
 
