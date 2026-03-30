@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Overlay ASLP - Realtime</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --aslp-red-dark: #8b0000;
+            --aslp-red-light: #c41e3a;
+            --aslp-black-dark: #1a1a1a;
+            --aslp-black-light: #333333;
+            --aslp-yellow: #fff200;
+            --aslp-green: #009432;
+            --aslp-fail: #ea2027;
+        }
+
+        body { margin: 0; padding: 20px; background: transparent; font-family: 'Montserrat', sans-serif; overflow: hidden; background-color: rgb(0, 0, 0) }
+        .container { width: 900px; display: flex; flex-direction: column; gap: 5px; opacity: 0; transition: opacity 0.3s ease; }
+        .top-bar { display: flex; height: 45px; }
+        .cat-box { background: linear-gradient(to right, var(--aslp-red-dark), var(--aslp-red-light)); color: white; font-weight: 700; font-size: 26px; padding: 0 20px; display: flex; align-items: center; flex: 1; text-transform: uppercase; white-space: nowrap; width: min-content; margin-left: 3%; border-radius: 8px; border: none; }
+        .rack-box { background: white; color: black; font-weight: 700; font-size: 24px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; flex: 1.5; border-radius: 8px; border: none; }
+        .middle-bar { display: flex; height: 80px; }
+        .name-box { background: linear-gradient(to right, var(--aslp-red-dark), var(--aslp-red-light)); color: white; padding: 5px 20px; display: flex; flex-direction: column; justify-content: center; flex: 2.5; line-height: 1.1; border-radius: 8px; border: none; }
+        #apellido { font-size: 30px; font-weight: 900; text-transform: uppercase; }
+        #nombre { font-size: 18px; font-weight: 700; text-transform: uppercase; }
+        .team-box { background: linear-gradient(to right, var(--aslp-black-dark), var(--aslp-black-light)); color: white; font-size: 26px; font-weight: 700; padding: 0 20px; display: flex; align-items: center; justify-content: flex-start; flex: 1; text-align: right; border-radius: 8px; border: 2px solid #000000; border-left: 2px solid #000000; }
+        .bottom-bar { background: white; height: 80px; display: flex; align-items: center; border-radius: 8px; border: 2px solid #ddd; padding: 0 15px; }
+        .logo-placeholder { width: 100%; display: flex; align-items: center; justify-content: space-between; }
+        img { width: 250px; height: 130px; margin-top: 10px; }
+        .attempts-container { display: flex; gap: 25px; align-items: center; }
+        .attempt-num { font-size: 32px; font-weight: 800; padding: 0; background: transparent; border-radius: 0; }
+        .att-good { color: var(--aslp-green); margin-right: 40px; }
+        .att-bad { color: var(--aslp-fail); margin-right: 40px; }
+        .att-current { background-color: var(--aslp-yellow); color: black !important; font-size: 36px; padding: 2px 25px; border-radius: 8px; box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2); margin-left: 10px; height: 60px; display: flex; align-items: center; justify-content: center; margin-left: 200px; }
+    </style>
+</head>
+<body>
+    <div class="container" id="mainOverlay">
+        <div class="top-bar">
+            <div class="cat-box" id="categoria">-</div>
+            <div class="rack-box">
+                <span>ALTURA RACK</span>
+                <span id="rack">:--</span>
+            </div>
+        </div>
+        <div class="middle-bar">
+            <div class="name-box">
+                <div id="apellido">APELLIDO</div>
+                <div id="nombre">NOMBRE</div>
+            </div>
+            <div class="team-box" id="club">Equipo</div>
+        </div>
+        <div class="bottom-bar">
+            <div class="logo-placeholder">
+                <div class="logo-text">
+                    <img src="./img/logo.png" alt="Logo ASLP">
+                </div>
+                <div class="attempts-container" id="attemptsList">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script>
+        // ============================================================
+        // CONFIGURACIÓN SUPABASE
+        // ============================================================
+        const SUPABASE_URL = "https://iriebjmbxjdzqtcudujr.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_JZ9Nos21mSNw2VNsLIx6NQ_svIZWGQM";
+
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ============================================================
+        // REFERENCIAS AL DOM
+        // ============================================================
+        const overlay = document.getElementById("mainOverlay");
+        const elCategoria = document.getElementById("categoria");
+        const elRack = document.getElementById("rack");
+        const elApellido = document.getElementById("apellido");
+        const elNombre = document.getElementById("nombre");
+        const elClub = document.getElementById("club");
+        const elAttemptsList = document.getElementById("attemptsList");
+
+        const MOVEMENT_LABELS = { SQ: "SQUAT", BP: "BENCH PRESS", DL: "DEADLIFT" };
+
+        // ============================================================
+        // FUNCIONES DE RENDERIZADO
+        // ============================================================
+
+        function showOverlay() {
+            overlay.style.opacity = "1";
+        }
+
+        function hideOverlay() {
+            overlay.style.opacity = "0";
+        }
+
+        function clearOverlay() {
+            elCategoria.textContent = "-";
+            elRack.textContent = ":--";
+            elApellido.textContent = "APELLIDO";
+            elNombre.textContent = "NOMBRE";
+            elClub.textContent = "Equipo";
+            elAttemptsList.innerHTML = "";
+        }
+
+        /**
+         * Renderiza los 3 intentos del movimiento actual en la barra inferior.
+         * Usa las clases CSS: att-good, att-bad, att-current
+         */
+        function renderAttempts(attempts, currentAttemptNumber) {
+            elAttemptsList.innerHTML = "";
+
+            // Filtrar solo los intentos del movimiento actual y ordenar
+            const sorted = attempts
+                .filter(a => a.attempt_number >= 1 && a.attempt_number <= 3)
+                .sort((a, b) => a.attempt_number - b.attempt_number);
+
+            sorted.forEach((attempt) => {
+                const span = document.createElement("span");
+                span.classList.add("attempt-num");
+
+                // Mostrar el peso del intento
+                const weightText = attempt.weight > 0 ? `${attempt.weight}` : "--";
+
+                switch (attempt.status) {
+                    case "GOOD":
+                        span.classList.add("att-good");
+                        span.textContent = weightText;
+                        break;
+                    case "BAD":
+                        span.classList.add("att-bad");
+                        span.textContent = weightText;
+                        break;
+                    case "CURRENT":
+                        span.classList.add("att-current");
+                        span.textContent = weightText;
+                        break;
+                    case "PENDING":
+                    default:
+                        span.style.color = "#999";
+                        span.textContent = weightText;
+                        break;
+                }
+
+                elAttemptsList.appendChild(span);
+            });
+        }
+
+        /**
+         * Carga los datos completos del atleta y sus intentos.
+         * Se llama cada vez que live_state cambia.
+         */
+        async function loadAthleteData(athleteId, movement, attemptNumber, weight) {
+            if (!athleteId) {
+                hideOverlay();
+                clearOverlay();
+                return;
+            }
+
+            // Fetch datos del atleta
+            const { data: athlete, error: athleteError } = await supabaseClient
+                .from("athletes")
+                .select("*")
+                .eq("id", athleteId)
+                .single();
+
+            if (athleteError || !athlete) {
+                console.error("Error fetching athlete:", athleteError);
+                return;
+            }
+
+            // Fetch intentos del movimiento actual
+            const { data: attempts, error: attemptsError } = await supabaseClient
+                .from("attempts")
+                .select("*")
+                .eq("athlete_id", athleteId)
+                .eq("movement", movement)
+                .order("attempt_number", { ascending: true });
+
+            if (attemptsError) {
+                console.error("Error fetching attempts:", attemptsError);
+                return;
+            }
+
+            // Inyectar datos en el DOM
+            elCategoria.textContent = athlete.categoria || "-";
+            // Rack depende del movimiento: SQ → rack_sq, BP → rack_bp, DL → sin rack
+            const rackValue = movement === "BP" ? athlete.altura_rack_bp : (movement === "SQ" ? athlete.altura_rack_sq : "");
+            elRack.textContent = rackValue ? `: ${rackValue}` : (movement === "DL" ? ": N/A" : ":--");
+            elApellido.textContent = athlete.apellido?.toUpperCase() || "APELLIDO";
+            elNombre.textContent = athlete.nombre?.toUpperCase() || "NOMBRE";
+            elClub.textContent = athlete.club || "Equipo";
+
+            // Renderizar intentos
+            renderAttempts(attempts ?? [], attemptNumber);
+
+            // Mostrar overlay
+            showOverlay();
+        }
+
+        // ============================================================
+        // SUSCRIPCIÓN REALTIME A LIVE_STATE
+        // ============================================================
+
+        async function initRealtime() {
+            // Cargar estado actual inicial
+            const { data: initialState, error } = await supabaseClient
+                .from("live_state")
+                .select("*")
+                .eq("id", 1)
+                .single();
+
+            if (error) {
+                console.error("Error fetching initial state:", error);
+            } else if (initialState && initialState.is_live) {
+                await loadAthleteData(
+                    initialState.athlete_id,
+                    initialState.current_movement,
+                    initialState.current_attempt,
+                    initialState.current_weight
+                );
+            } else {
+                hideOverlay();
+            }
+
+            // Suscribirse a cambios en tiempo real
+            const channel = supabaseClient
+                .channel("live-state-overlay")
+                .on(
+                    "postgres_changes",
+                    {
+                        event: "UPDATE",
+                        schema: "public",
+                        table: "live_state",
+                        filter: "id=eq.1",
+                    },
+                    async (payload) => {
+                        const state = payload.new;
+
+                        if (state.is_live) {
+                            await loadAthleteData(
+                                state.athlete_id,
+                                state.current_movement,
+                                state.current_attempt,
+                                state.current_weight
+                            );
+                        } else {
+                            // No está en vivo — ocultar overlay con fade
+                            hideOverlay();
+                        }
+                    }
+                )
+                .on(
+                    "postgres_changes",
+                    {
+                        event: "*",
+                        schema: "public",
+                        table: "attempts",
+                    },
+                    async (_payload) => {
+                        // Si hay un atleta en vivo, recargar sus datos
+                        // para reflejar cambios de peso o estado
+                        const { data: currentState } = await supabaseClient
+                            .from("live_state")
+                            .select("*")
+                            .eq("id", 1)
+                            .single();
+
+                        if (currentState && currentState.is_live && currentState.athlete_id) {
+                            await loadAthleteData(
+                                currentState.athlete_id,
+                                currentState.current_movement,
+                                currentState.current_attempt,
+                                currentState.current_weight
+                            );
+                        }
+                    }
+                )
+                .subscribe((status) => {
+                    console.log("Realtime status:", status);
+                });
+        }
+
+        // ============================================================
+        // INICIO
+        // ============================================================
+        initRealtime();
+    </script>
+</body>
+</html>

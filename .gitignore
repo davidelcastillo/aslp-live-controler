@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+nul
 
 # debug
 npm-debug.log*
@@ -39,3 +40,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Agent tools (local config)
+.agent/
+.agents/
+
+# Prompt files
+*-promt.md
+skills-lock.json

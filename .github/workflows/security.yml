@@ -1,0 +1,140 @@
+name: Security Audit
+
+on:
+  schedule:
+    # Run every Monday at 9:00 UTC
+    - cron: '0 9 * * 1'
+  push:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-audit:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit
+        run: |
+          echo "## 🔒 Dependency Audit Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          npm audit --json > audit.json 2>&1 || true
+          
+          VULNS=$(cat audit.json | node -e "
+            const data = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+            const meta = data.metadata?.vulnerabilities || {};
+            console.log(JSON.stringify(meta));
+          ")
+          
+          CRITICAL=$(echo $VULNS | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); console.log(d.critical||0)")
+          HIGH=$(echo $VULNS | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); console.log(d.high||0)")
+          MODERATE=$(echo $VULNS | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); console.log(d.moderate||0)")
+          LOW=$(echo $VULNS | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); console.log(d.low||0)")
+          
+          echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔴 Critical | $CRITICAL |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟠 High | $HIGH |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟡 Moderate | $MODERATE |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟢 Low | $LOW |" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Critical or high vulnerabilities found!**" >> $GITHUB_STEP_SUMMARY
+            npm audit
+            exit 1
+          fi
+
+      - name: Check for outdated packages
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📦 Outdated Packages" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          npm outdated >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:javascript-typescript'
+
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for hardcoded secrets
+        run: |
+          echo "## 🔐 Secret Detection" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          PATTERNS=(
+            'NEXT_PUBLIC_SUPABASE_ANON_KEY\s*=\s*[A-Za-z0-9]+'
+            'supabase_key\s*=\s*"[^"]+"'
+            'password\s*=\s*"[^"]+"'
+            'secret\s*=\s*"[^"]+"'
+            'token\s*=\s*"[^"]+"'
+          )
+          
+          FOUND=0
+          for pattern in "${PATTERNS[@]}"; do
+            MATCHES=$(git log --all -p | grep -iE "$pattern" | grep -v "tu-anon-key" | grep -v "YOUR_" | grep -v "example" || true)
+            if [ -n "$MATCHES" ]; then
+              echo "⚠️ Potential secret found matching pattern: \`$pattern\`" >> $GITHUB_STEP_SUMMARY
+              FOUND=1
+            fi
+          done
+          
+          if [ "$FOUND" -eq 0 ]; then
+            echo "✅ No hardcoded secrets detected in commit history." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Please review and rotate any exposed credentials." >> $GITHUB_STEP_SUMMARY
+          fi
